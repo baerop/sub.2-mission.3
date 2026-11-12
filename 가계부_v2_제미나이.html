@@ -1,0 +1,627 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>개인용 가계부</title>
+    <style>
+        :root {
+            --primary: #4CAF50;
+            --income: #007bff;
+            --expense: #dc3545;
+            --no-spend: #fff3cd;
+            --bg-color: #f4f7f6;
+            --border: #e0e0e0;
+            --text-main: #333;
+            --text-muted: #777;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Malgun Gothic', 'Apple SD Gothic Neo', sans-serif; }
+        body { background-color: var(--bg-color); color: var(--text-main); height: 100vh; display: flex; flex-direction: column; overflow: hidden; }
+        
+        /* Header */
+        header { background: white; padding: 15px 20px; display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border); box-shadow: 0 2px 5px rgba(0,0,0,0.05); z-index: 10; }
+        .header-left { display: flex; align-items: center; gap: 15px; }
+        .month-nav { display: flex; align-items: center; gap: 10px; font-size: 1.2rem; font-weight: bold; }
+        .month-nav button { background: none; border: 1px solid var(--border); padding: 5px 10px; cursor: pointer; border-radius: 4px; }
+        .month-nav button:hover { background: #f0f0f0; }
+        .budget-info { display: flex; gap: 15px; font-size: 0.95rem; align-items: center; background: #f8f9fa; padding: 8px 15px; border-radius: 20px; }
+        .header-right { display: flex; gap: 10px; }
+        .btn { padding: 8px 15px; border: none; border-radius: 4px; cursor: pointer; color: white; font-weight: bold; }
+        .btn-primary { background-color: var(--primary); }
+        .btn-secondary { background-color: #6c757d; }
+        
+        /* Main Layout */
+        .container { display: flex; flex: 1; overflow: hidden; }
+        
+        /* Calendar Section */
+        .calendar-section { flex: 7; display: flex; flex-direction: column; padding: 20px; overflow-y: auto; background: white; border-right: 1px solid var(--border); }
+        .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 1px; background: var(--border); border: 1px solid var(--border); flex: 1; }
+        .day-name { background: #f8f9fa; text-align: center; padding: 10px; font-weight: bold; }
+        .day-name:first-child { color: var(--expense); } /* 일요일 */
+        .day-name:last-child { color: var(--income); } /* 토요일 */
+        .calendar-cell { background: white; padding: 5px; display: flex; flex-direction: column; min-height: 120px; cursor: pointer; transition: background 0.2s; }
+        .calendar-cell:hover { background: #f1f1f1; }
+        .calendar-cell.selected { border: 2px solid var(--primary); }
+        .calendar-cell.no-spend { background-color: var(--no-spend); }
+        .date-num { font-weight: bold; margin-bottom: 5px; }
+        .daily-totals { font-size: 0.75rem; margin-bottom: 5px; border-bottom: 1px dashed #ccc; padding-bottom: 3px; }
+        .total-income { color: var(--income); }
+        .total-expense { color: var(--expense); }
+        .item-list { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+        .cal-item { font-size: 0.75rem; padding: 2px 4px; border-radius: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; color: white; }
+        .cal-item.income { background-color: var(--income); }
+        .cal-item.expense { background-color: var(--expense); }
+        .more-items { font-size: 0.75rem; color: var(--text-muted); text-align: center; font-weight: bold; }
+
+        /* Right Panel */
+        .panel-section { flex: 3; display: flex; flex-direction: column; background: white; }
+        .panel-header { padding: 15px; background: #f8f9fa; border-bottom: 1px solid var(--border); font-weight: bold; font-size: 1.1rem; }
+        .form-section { padding: 15px; border-bottom: 1px solid var(--border); }
+        .form-group { margin-bottom: 15px; display: flex; flex-direction: column; gap: 8px; }
+        .form-group label { font-size: 0.9rem; font-weight: bold; color: var(--text-muted); }
+        .form-group input[type="text"], .form-group input[type="number"], .form-group select { padding: 10px; border: 1px solid var(--border); border-radius: 6px; font-size: 1rem; }
+        
+        /* Date Input Styling (이미지처럼 크고 명확하게) */
+        input[type="date"] {
+            font-size: 1.2rem;
+            padding: 12px;
+            border: 1px solid var(--border);
+            border-radius: 6px;
+            font-family: 'Courier New', Courier, monospace; /* 숫자 가독성을 높임 */
+            cursor: pointer;
+        }
+
+        /* Type Toggle Buttons (이미지처럼 수입/지출 버튼화) */
+        .type-toggle { display: flex; gap: 10px; }
+        .type-toggle input[type="radio"] { display: none; }
+        .type-toggle label { 
+            flex: 1; 
+            text-align: center; 
+            padding: 12px; 
+            border: 1px solid var(--border); 
+            border-radius: 6px; 
+            cursor: pointer; 
+            font-weight: bold;
+            background: white;
+            color: var(--text-muted);
+            transition: all 0.2s;
+            font-size: 1rem;
+        }
+        .type-toggle input[value="income"]:checked + label {
+            background: var(--income);
+            color: white;
+            border-color: var(--income);
+        }
+        .type-toggle input[value="expense"]:checked + label {
+            background: var(--expense);
+            color: white;
+            border-color: var(--expense);
+        }
+
+        /* List Section */
+        .list-section { flex: 1; overflow-y: auto; padding: 15px; }
+        .record-item { border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; }
+        .record-info { display: flex; flex-direction: column; gap: 3px; }
+        .record-category { font-size: 0.75rem; background: #eee; padding: 2px 6px; border-radius: 10px; display: inline-block; width: fit-content; }
+        .record-memo { font-size: 0.9rem; }
+        .record-amount { font-weight: bold; font-size: 1.1rem; }
+        .record-amount.income { color: var(--income); }
+        .record-amount.expense { color: var(--expense); }
+        .record-actions button { background: none; border: none; cursor: pointer; font-size: 0.8rem; color: var(--text-muted); margin-left: 5px; }
+        .record-actions button:hover { color: var(--text-main); }
+
+        /* Modals */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; right: 0; bottom: 0; background: rgba(0,0,0,0.5); z-index: 100; justify-content: center; align-items: center; }
+        .modal { background: white; padding: 20px; border-radius: 8px; width: 400px; max-width: 90%; max-height: 80vh; overflow-y: auto; }
+        .modal h2 { margin-bottom: 15px; font-size: 1.2rem; }
+        .modal-close { float: right; cursor: pointer; font-size: 1.5rem; line-height: 1; }
+        
+        /* Category Manager */
+        .cat-list { list-style: none; margin-bottom: 15px; max-height: 200px; overflow-y: auto; }
+        .cat-list li { display: flex; justify-content: space-between; padding: 8px; border-bottom: 1px solid #eee; }
+        .cat-list button { color: var(--expense); background: none; border: none; cursor: pointer; }
+        
+        /* Search Results */
+        #searchResults { margin-top: 15px; }
+    </style>
+</head>
+<body>
+
+    <header>
+        <div class="header-left">
+            <div class="month-nav">
+                <button onclick="changeMonth(-1)">◀ 이전 달</button>
+                <span id="currentMonthDisplay">2025년 2월</span>
+                <button onclick="changeMonth(1)">다음 달 ▶</button>
+                <input type="month" id="monthPicker" onchange="goToMonth(this.value)" style="margin-left:10px; padding:5px;">
+            </div>
+            <div class="budget-info">
+                <span>월 목표(지출): <input type="number" id="budgetInput" placeholder="금액 입력" onchange="saveBudget()" style="width:100px; padding:3px;">원</span>
+                <span>남은 금액: <strong id="remainingBudget">0원</strong></span>
+            </div>
+        </div>
+        <div class="header-right">
+            <button class="btn btn-secondary" onclick="openModal('categoryModal')">카테고리 관리</button>
+            <button class="btn btn-primary" onclick="openModal('searchModal')">검색</button>
+        </div>
+    </header>
+
+    <div class="container">
+        <!-- Calendar -->
+        <div class="calendar-section">
+            <div class="calendar-grid" id="calendarGrid">
+                <!-- Days of week -->
+                <div class="day-name">일</div><div class="day-name">월</div><div class="day-name">화</div>
+                <div class="day-name">수</div><div class="day-name">목</div><div class="day-name">금</div><div class="day-name">토</div>
+                <!-- Cells will be generated by JS -->
+            </div>
+        </div>
+
+        <!-- Right Panel -->
+        <div class="panel-section">
+            <div class="panel-header" id="panelDateDisplay">날짜를 선택하세요</div>
+            
+            <div class="form-section">
+                <form id="recordForm" onsubmit="saveRecord(event)">
+                    <input type="hidden" id="recordId">
+                    
+                    <!-- 1. 날짜 입력 (이미지처럼 상단에 크게 배치) -->
+                    <div class="form-group">
+                        <label>날짜</label>
+                        <input type="date" id="recordDate" required onchange="handleDateInputChange(this.value)">
+                    </div>
+
+                    <!-- 2. 수입/지출 구분 (이미지처럼 버튼 형태로 변경) -->
+                    <div class="form-group">
+                        <label>구분</label>
+                        <div class="type-toggle">
+                            <input type="radio" id="typeIncome" name="type" value="income">
+                            <label for="typeIncome">수입</label>
+                            
+                            <input type="radio" id="typeExpense" name="type" value="expense" checked>
+                            <label for="typeExpense">지출</label>
+                        </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label>금액</label>
+                        <input type="number" id="amount" required placeholder="예: 12000">
+                    </div>
+                    <div class="form-group">
+                        <label>카테고리</label>
+                        <select id="category" required></select>
+                    </div>
+                    <div class="form-group">
+                        <label>결제수단</label>
+                        <input type="text" id="paymentMethod" placeholder="예: 신용카드, 현금">
+                    </div>
+                    <div class="form-group">
+                        <label>메모</label>
+                        <input type="text" id="memo" placeholder="내역을 입력하세요">
+                    </div>
+                    <button type="submit" class="btn btn-primary" style="width: 100%; margin-top: 10px; padding: 12px; font-size: 1.1rem;">저장하기</button>
+                    <button type="button" class="btn btn-secondary" id="cancelEditBtn" style="width: 100%; margin-top: 5px; padding: 12px;" onclick="resetForm()" style="display: none;">수정 취소</button>
+                </form>
+            </div>
+
+            <div class="list-section" id="recordList">
+                <!-- Records will be listed here -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Category Modal -->
+    <div class="modal-overlay" id="categoryModal">
+        <div class="modal">
+            <span class="modal-close" onclick="closeModal('categoryModal')">&times;</span>
+            <h2>카테고리 관리</h2>
+            <ul class="cat-list" id="categoryList"></ul>
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="newCategory" placeholder="새 카테고리명" style="flex:1; padding:8px;">
+                <button class="btn btn-primary" onclick="addCategory()">추가</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Search Modal -->
+    <div class="modal-overlay" id="searchModal">
+        <div class="modal" style="width: 500px;">
+            <span class="modal-close" onclick="closeModal('searchModal')">&times;</span>
+            <h2>내역 검색</h2>
+            <div style="display: flex; gap: 5px;">
+                <input type="text" id="searchInput" placeholder="메모, 카테고리, 결제수단 검색" style="flex:1; padding:8px;" onkeyup="if(event.key==='Enter') searchRecords()">
+                <button class="btn btn-primary" onclick="searchRecords()">검색</button>
+            </div>
+            <div id="searchResults" class="list-section" style="max-height: 400px; padding:0;"></div>
+        </div>
+    </div>
+
+    <script>
+        // Data State
+        let records = JSON.parse(localStorage.getItem('records')) || [];
+        let categories = JSON.parse(localStorage.getItem('categories')) || ['식비', '교통비', '주거비', '급여', '용돈', '기타'];
+        let budgets = JSON.parse(localStorage.getItem('budgets')) || {};
+        
+        let currentDate = new Date();
+        let selectedDate = getLocalISOString(new Date());
+
+        // Utility: Format Currency
+        function formatCurrency(num) {
+            return Number(num).toLocaleString('ko-KR') + '원';
+        }
+
+        // Utility: Get YYYY-MM-DD in local time
+        function getLocalISOString(date) {
+            const offset = date.getTimezoneOffset() * 60000;
+            return (new Date(date - offset)).toISOString().split('T')[0];
+        }
+
+        // Initialization
+        function init() {
+            renderCategories();
+            updateCalendar();
+            selectDate(selectedDate);
+        }
+
+        // --- Calendar Logic ---
+        function changeMonth(delta) {
+            currentDate.setMonth(currentDate.getMonth() + delta);
+            updateCalendar();
+        }
+
+        function goToMonth(val) {
+            if(!val) return;
+            const [year, month] = val.split('-');
+            currentDate.setFullYear(year, month - 1, 1);
+            updateCalendar();
+        }
+
+        function updateCalendar() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+            
+            // Update Headers
+            document.getElementById('currentMonthDisplay').innerText = `${year}년 ${month + 1}월`;
+            document.getElementById('monthPicker').value = monthKey;
+            document.getElementById('budgetInput').value = budgets[monthKey] || '';
+
+            const grid = document.getElementById('calendarGrid');
+            // Keep day names, remove old cells
+            while (grid.children.length > 7) {
+                grid.removeChild(grid.lastChild);
+            }
+
+            const firstDay = new Date(year, month, 1).getDay();
+            const lastDate = new Date(year, month + 1, 0).getDate();
+            const todayStr = getLocalISOString(new Date());
+
+            // Padding before 1st day
+            for (let i = 0; i < firstDay; i++) {
+                const emptyCell = document.createElement('div');
+                emptyCell.className = 'calendar-cell';
+                emptyCell.style.backgroundColor = '#fafafa';
+                grid.appendChild(emptyCell);
+            }
+
+            let monthExpense = 0;
+
+            // Days
+            for (let d = 1; d <= lastDate; d++) {
+                const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
+                const cell = document.createElement('div');
+                cell.className = 'calendar-cell';
+                if (dateStr === selectedDate) cell.classList.add('selected');
+                cell.onclick = () => selectDate(dateStr);
+
+                // Date Number
+                const dateNum = document.createElement('div');
+                dateNum.className = 'date-num';
+                dateNum.innerText = d;
+                cell.appendChild(dateNum);
+
+                // Filter records for this day
+                const dayRecords = records.filter(r => r.date === dateStr);
+                let dayIncome = 0;
+                let dayExpense = 0;
+
+                dayRecords.forEach(r => {
+                    if (r.type === 'income') dayIncome += Number(r.amount);
+                    else dayExpense += Number(r.amount);
+                });
+
+                monthExpense += dayExpense;
+
+                // No-spend logic
+                if (dateStr <= todayStr && dayExpense === 0) {
+                    cell.classList.add('no-spend');
+                }
+
+                // Daily Totals
+                const totalsDiv = document.createElement('div');
+                totalsDiv.className = 'daily-totals';
+                totalsDiv.innerHTML = `
+                    <div class="total-income">수입: ${formatCurrency(dayIncome)}</div>
+                    <div class="total-expense">지출: ${formatCurrency(dayExpense)}</div>
+                `;
+                cell.appendChild(totalsDiv);
+
+                // Items (Max 3)
+                const itemList = document.createElement('div');
+                itemList.className = 'item-list';
+                
+                dayRecords.slice(0, 3).forEach(r => {
+                    const item = document.createElement('div');
+                    item.className = `cal-item ${r.type}`;
+                    item.innerText = `${r.memo || r.category} ${formatCurrency(r.amount)}`;
+                    itemList.appendChild(item);
+                });
+
+                if (dayRecords.length > 3) {
+                    const more = document.createElement('div');
+                    more.className = 'more-items';
+                    more.innerText = `+${dayRecords.length - 3}`;
+                    itemList.appendChild(more);
+                }
+
+                cell.appendChild(itemList);
+                grid.appendChild(cell);
+            }
+
+            // Calculate Remaining Budget
+            const budget = Number(budgets[monthKey]) || 0;
+            const remaining = budget - monthExpense;
+            const remainingEl = document.getElementById('remainingBudget');
+            remainingEl.innerText = formatCurrency(remaining);
+            remainingEl.style.color = remaining < 0 ? 'var(--expense)' : 'var(--text-main)';
+        }
+
+        // --- Right Panel Logic ---
+        
+        // 사용자가 오른쪽 패널에서 날짜를 직접 변경했을 때 실행되는 함수
+        function handleDateInputChange(val) {
+            if(!val) return;
+            
+            const [y, m, d] = val.split('-');
+            const currentY = currentDate.getFullYear();
+            const currentM = currentDate.getMonth() + 1;
+            
+            // 선택한 날짜가 현재 보고 있는 달력의 달과 다르면 달력도 이동시킴
+            if (Number(y) !== currentY || Number(m) !== currentM) {
+                currentDate.setFullYear(y, m - 1, 1);
+            }
+            
+            selectDate(val);
+        }
+
+        function selectDate(dateStr) {
+            selectedDate = dateStr;
+            const [y, m, d] = dateStr.split('-');
+            
+            // 패널 헤더 업데이트
+            document.getElementById('panelDateDisplay').innerText = `${y}년 ${Number(m)}월 ${Number(d)}일 내역`;
+            
+            // 오른쪽 입력 폼의 날짜 input 값도 동기화
+            document.getElementById('recordDate').value = dateStr;
+            
+            // 달력 선택 UI 업데이트
+            document.querySelectorAll('.calendar-cell').forEach(cell => cell.classList.remove('selected'));
+            updateCalendar(); 
+            
+            renderRecordList();
+            resetForm();
+        }
+
+        function renderRecordList() {
+            const listEl = document.getElementById('recordList');
+            listEl.innerHTML = '';
+            
+            const dayRecords = records.filter(r => r.date === selectedDate);
+            
+            if (dayRecords.length === 0) {
+                listEl.innerHTML = '<p style="color:var(--text-muted); text-align:center; margin-top:20px;">기록된 내역이 없습니다.</p>';
+                return;
+            }
+
+            dayRecords.forEach(r => {
+                const item = document.createElement('div');
+                item.className = 'record-item';
+                item.innerHTML = `
+                    <div class="record-info">
+                        <span class="record-category">${r.category} ${r.paymentMethod ? ' | '+r.paymentMethod : ''}</span>
+                        <span class="record-memo">${r.memo || '-'}</span>
+                    </div>
+                    <div style="text-align: right;">
+                        <div class="record-amount ${r.type}">${r.type === 'income' ? '+' : '-'}${formatCurrency(r.amount)}</div>
+                        <div class="record-actions">
+                            <button onclick="editRecord('${r.id}')">수정</button>
+                            <button onclick="deleteRecord('${r.id}')">삭제</button>
+                        </div>
+                    </div>
+                `;
+                listEl.appendChild(item);
+            });
+        }
+
+        // --- CRUD Logic ---
+        function saveRecord(e) {
+            e.preventDefault();
+            const id = document.getElementById('recordId').value;
+            const type = document.querySelector('input[name="type"]:checked').value;
+            
+            // 폼에 입력된 날짜를 가져옴
+            const inputDate = document.getElementById('recordDate').value; 
+            const amount = document.getElementById('amount').value;
+            const category = document.getElementById('category').value;
+            const paymentMethod = document.getElementById('paymentMethod').value;
+            const memo = document.getElementById('memo').value;
+
+            const recordData = {
+                id: id || Date.now().toString(),
+                date: inputDate,
+                type, amount, category, paymentMethod, memo
+            };
+
+            if (id) {
+                const idx = records.findIndex(r => r.id === id);
+                records[idx] = recordData;
+            } else {
+                records.push(recordData);
+            }
+
+            saveData();
+
+            // 만약 저장할 때 날짜를 변경했다면, 해당 날짜로 달력과 리스트를 이동시킴
+            if (inputDate !== selectedDate) {
+                handleDateInputChange(inputDate);
+            } else {
+                updateCalendar();
+                renderRecordList();
+                resetForm();
+            }
+        }
+
+        function editRecord(id) {
+            const r = records.find(x => x.id === id);
+            if(!r) return;
+            
+            document.getElementById('recordId').value = r.id;
+            document.querySelector(`input[name="type"][value="${r.type}"]`).checked = true;
+            document.getElementById('recordDate').value = r.date; // 수정 시 날짜 세팅
+            document.getElementById('amount').value = r.amount;
+            document.getElementById('category').value = r.category;
+            document.getElementById('paymentMethod').value = r.paymentMethod;
+            document.getElementById('memo').value = r.memo;
+            
+            document.getElementById('cancelEditBtn').style.display = 'block';
+        }
+
+        function deleteRecord(id) {
+            if(confirm('이 내역을 삭제하시겠습니까?')) {
+                records = records.filter(r => r.id !== id);
+                saveData();
+                updateCalendar();
+                renderRecordList();
+            }
+        }
+
+        function resetForm() {
+            document.getElementById('recordForm').reset();
+            document.getElementById('recordId').value = '';
+            document.getElementById('cancelEditBtn').style.display = 'none';
+            // 폼을 리셋하면 날짜도 지워지므로, 현재 선택된 날짜로 다시 채워줍니다.
+            document.getElementById('recordDate').value = selectedDate;
+        }
+
+        function saveBudget() {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth();
+            const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+            budgets[monthKey] = document.getElementById('budgetInput').value;
+            localStorage.setItem('budgets', JSON.stringify(budgets));
+            updateCalendar();
+        }
+
+        function saveData() {
+            localStorage.setItem('records', JSON.stringify(records));
+        }
+
+        // --- Category Logic ---
+        function renderCategories() {
+            // Update Select Box
+            const select = document.getElementById('category');
+            select.innerHTML = '';
+            categories.forEach(c => {
+                const opt = document.createElement('option');
+                opt.value = c; opt.innerText = c;
+                select.appendChild(opt);
+            });
+
+            // Update Modal List
+            const list = document.getElementById('categoryList');
+            list.innerHTML = '';
+            categories.forEach((c, idx) => {
+                const li = document.createElement('li');
+                li.innerHTML = `<span>${c}</span> <button onclick="deleteCategory(${idx})">삭제</button>`;
+                list.appendChild(li);
+            });
+        }
+
+        function addCategory() {
+            const input = document.getElementById('newCategory');
+            const val = input.value.trim();
+            if (val && !categories.includes(val)) {
+                categories.push(val);
+                localStorage.setItem('categories', JSON.stringify(categories));
+                input.value = '';
+                renderCategories();
+            }
+        }
+
+        function deleteCategory(idx) {
+            if(confirm('카테고리를 삭제하시겠습니까? (기존 내역은 유지됩니다)')) {
+                categories.splice(idx, 1);
+                localStorage.setItem('categories', JSON.stringify(categories));
+                renderCategories();
+            }
+        }
+
+        // --- Search Logic ---
+        function searchRecords() {
+            const keyword = document.getElementById('searchInput').value.toLowerCase();
+            const resultsEl = document.getElementById('searchResults');
+            resultsEl.innerHTML = '';
+
+            if(!keyword) {
+                resultsEl.innerHTML = '<p style="text-align:center; color:#777;">검색어를 입력하세요.</p>';
+                return;
+            }
+
+            const results = records.filter(r => 
+                (r.memo && r.memo.toLowerCase().includes(keyword)) ||
+                (r.category && r.category.toLowerCase().includes(keyword)) ||
+                (r.paymentMethod && r.paymentMethod.toLowerCase().includes(keyword))
+            );
+
+            // Sort by date descending
+            results.sort((a, b) => new Date(b.date) - new Date(a.date));
+
+            if(results.length === 0) {
+                resultsEl.innerHTML = '<p style="text-align:center; color:#777;">검색 결과가 없습니다.</p>';
+                return;
+            }
+
+            results.forEach(r => {
+                const item = document.createElement('div');
+                item.className = 'record-item';
+                item.innerHTML = `
+                    <div class="record-info">
+                        <span style="font-size:0.8rem; font-weight:bold; color:var(--primary);">${r.date}</span>
+                        <span class="record-category">${r.category} ${r.paymentMethod ? ' | '+r.paymentMethod : ''}</span>
+                        <span class="record-memo">${r.memo || '-'}</span>
+                    </div>
+                    <div class="record-amount ${r.type}">${r.type === 'income' ? '+' : '-'}${formatCurrency(r.amount)}</div>
+                `;
+                resultsEl.appendChild(item);
+            });
+        }
+
+        // --- Modal Logic ---
+        function openModal(id) {
+            document.getElementById(id).style.display = 'flex';
+            if(id === 'searchModal') {
+                document.getElementById('searchInput').value = '';
+                document.getElementById('searchResults').innerHTML = '';
+            }
+        }
+
+        function closeModal(id) {
+            document.getElementById(id).style.display = 'none';
+        }
+
+        // Run on load
+        window.onload = init;
+    </script>
+</body>
+</html>
